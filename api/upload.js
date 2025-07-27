@@ -1,28 +1,33 @@
-import fs from 'fs';
-import path from 'path';
-
 export const config = {
   api: {
-    bodyParser: {
-      sizeLimit: '10mb',
-    },
+    bodyParser: false,
   },
 };
 
+import fs from 'fs';
+import path from 'path';
+
 export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    const { image, filename } = req.body;
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Only POST allowed' });
+  }
 
-    if (!image || !filename) {
-      return res.status(400).json({ message: 'Missing image or filename' });
+  try {
+    const chunks = [];
+    for await (const chunk of req) {
+      chunks.push(chunk);
     }
+    const buffer = Buffer.concat(chunks);
 
-    const buffer = Buffer.from(image, 'base64');
-    const filePath = path.join('/tmp', filename);
-    fs.writeFileSync(filePath, buffer);
+    const filename = `esp32cam_${Date.now()}.jpg`;
+    const savePath = path.join('/tmp', filename);
+    fs.writeFileSync(savePath, buffer);
 
-    return res.status(200).json({ message: 'Image received', path: filePath });
-  } else {
-    res.status(405).end(); // Method Not Allowed
+    console.log('📸 Gambar disimpan ke:', savePath);
+
+    return res.status(200).json({ message: 'Gambar diterima', filename });
+  } catch (err) {
+    console.error('❌ Error:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 }
