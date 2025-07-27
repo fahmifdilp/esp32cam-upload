@@ -1,33 +1,32 @@
+// api/upload.js
+import { writeFile } from 'fs/promises';
+
 export const config = {
   api: {
-    bodyParser: false,
+    bodyParser: {
+      sizeLimit: '4mb', // Batas ukuran gambar
+    },
   },
 };
-
-import fs from 'fs';
-import path from 'path';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Only POST allowed' });
   }
 
+  const { image, filename } = req.body;
+
+  if (!image || !filename) {
+    return res.status(400).json({ error: 'Missing image or filename' });
+  }
+
+  const base64Data = image.replace(/^data:image\/jpeg;base64,/, '');
+  const filePath = `./public/${filename}`;
+
   try {
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-
-    const filename = `esp32cam_${Date.now()}.jpg`;
-    const savePath = path.join('/tmp', filename);
-    fs.writeFileSync(savePath, buffer);
-
-    console.log('📸 Gambar disimpan ke:', savePath);
-
-    return res.status(200).json({ message: 'Gambar diterima', filename });
+    await writeFile(filePath, base64Data, 'base64');
+    res.status(200).json({ message: 'Image saved', url: `/public/${filename}` });
   } catch (err) {
-    console.error('❌ Error:', err);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Failed to save image', detail: err.message });
   }
 }
